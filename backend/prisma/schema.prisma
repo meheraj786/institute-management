@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ====================== ENUMS ======================
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  ALUMNI
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+enum ExamStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+}
+
+enum PaymentMethod {
+  CASH
+  BKASH
+  NAGAD
+  BANK
+}
+
+enum FeeFrequency {
+  MONTHLY
+  YEARLY
+  ONE_TIME
+}
+
+// ====================== MODELS ======================
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  phone     String?
+  password  String
+  role      UserRole
+  status    Status    @default(ACTIVE)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  student         Student?
+  teacher         Teacher?
+  notices         Notice[]         @relation("PublishedBy")
+  attendancesTaken Attendance[]    @relation("TakenBy")
+  feeCollections  FeeCollection[]  @relation("CollectedBy")
+
+  @@map("users")
+}
+
+model AcademicYear {
+  id        Int      @id @default(autoincrement())
+  title     String
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  isCurrent Boolean  @default(false) @map("is_current")
+
+  // Relations
+  classSections      ClassSection[]
+  classSubjects      ClassSubject[]
+  studentEnrollments StudentEnrollment[]
+  teacherAssignments TeacherAssignment[]
+  attendances        Attendance[]
+  exams              Exam[]
+  feeStructures      FeeStructure[]
+  feeCollections     FeeCollection[]
+
+  @@map("academic_years")
+}
+
+model Class {
+  id           Int     @id @default(autoincrement())
+  name         String
+  numericValue Int?    @map("numeric_value")
+  status       Status  @default(ACTIVE)
+
+  // Relations
+  classSections      ClassSection[]
+  classSubjects      ClassSubject[]
+  studentEnrollments StudentEnrollment[]
+  teacherAssignments TeacherAssignment[]
+  attendances        Attendance[]
+  examSubjects       ExamSubject[]
+  feeStructures      FeeStructure[]
+
+  @@map("classes")
+}
+
+model Section {
+  id     Int    @id @default(autoincrement())
+  name   String
+  status Status @default(ACTIVE)
+
+  // Relations
+  classSections      ClassSection[]
+  studentEnrollments StudentEnrollment[]
+  teacherAssignments TeacherAssignment[]
+  attendances        Attendance[]
+
+  @@map("sections")
+}
+
+model ClassSection {
+  id             Int @id @default(autoincrement())
+  classId        Int @map("class_id")
+  sectionId      Int @map("section_id")
+  academicYearId Int @map("academic_year_id")
+
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section      @relation(fields: [sectionId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@map("class_sections")
+}
+
+model Subject {
+  id     Int    @id @default(autoincrement())
+  name   String
+  code   String?
+  status Status @default(ACTIVE)
+
+  // Relations
+  classSubjects      ClassSubject[]
+  teacherAssignments TeacherAssignment[]
+  examSubjects       ExamSubject[]
+  marks              Mark[]
+
+  @@map("subjects")
+}
+
+model ClassSubject {
+  id             Int @id @default(autoincrement())
+  classId        Int @map("class_id")
+  subjectId      Int @map("subject_id")
+  academicYearId Int @map("academic_year_id")
+
+  class        Class        @relation(fields: [classId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@map("class_subjects")
+}
+
+model Student {
+  id               Int           @id @default(autoincrement())
+  userId           Int           @unique @map("user_id")
+  studentId        String        @unique @map("student_id") // Roll / custom ID
+  admissionDate    DateTime?     @map("admission_date")
+  dateOfBirth      DateTime?     @map("date_of_birth")
+  gender           Gender?
+  bloodGroup       String?       @map("blood_group")
+  presentAddress   String?       @map("present_address")
+  permanentAddress String?       @map("permanent_address")
+  fatherName       String?       @map("father_name")
+  motherName       String?       @map("mother_name")
+  guardianPhone    String?       @map("guardian_phone")
+  photo            String?
+  status           StudentStatus @default(ACTIVE)
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  user               User                @relation(fields: [userId], references: [id])
+  enrollments        StudentEnrollment[]
+  attendances        Attendance[]
+  marks              Mark[]
+  feeCollections     FeeCollection[]
+
+  @@map("students")
+}
+
+model StudentEnrollment {
+  id             Int    @id @default(autoincrement())
+  studentId      Int    @map("student_id")
+  academicYearId Int    @map("academic_year_id")
+  classId        Int    @map("class_id")
+  sectionId      Int    @map("section_id")
+  rollNumber     String? @map("roll_number")
+  status         Status @default(ACTIVE)
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section      @relation(fields: [sectionId], references: [id])
+
+  @@map("student_enrollments")
+}
+
+model Teacher {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @unique @map("user_id")
+  employeeId   String?   @unique @map("employee_id")
+  joiningDate  DateTime? @map("joining_date")
+  designation  String?
+  qualification String?
+  status       Status    @default(ACTIVE)
+
+  // Relations
+  user         User                @relation(fields: [userId], references: [id])
+  assignments  TeacherAssignment[]
+
+  @@map("teachers")
+}
+
+model TeacherAssignment {
+  id             Int @id @default(autoincrement())
+  teacherId      Int @map("teacher_id")
+  classId        Int @map("class_id")
+  sectionId      Int @map("section_id")
+  subjectId      Int @map("subject_id")
+  academicYearId Int @map("academic_year_id")
+
+  teacher      Teacher      @relation(fields: [teacherId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section      @relation(fields: [sectionId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@map("teacher_assignments")
+}
+
+model Attendance {
+  id             Int              @id @default(autoincrement())
+  studentId      Int              @map("student_id")
+  academicYearId Int              @map("academic_year_id")
+  classId        Int              @map("class_id")
+  sectionId      Int              @map("section_id")
+  date           DateTime         @db.Date
+  status         AttendanceStatus
+  remarks        String?
+  takenBy        Int              @map("taken_by")
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section      @relation(fields: [sectionId], references: [id])
+  takenByUser  User         @relation("TakenBy", fields: [takenBy], references: [id])
+
+  @@map("attendances")
+}
+
+model Exam {
+  id             Int        @id @default(autoincrement())
+  name           String
+  academicYearId Int        @map("academic_year_id")
+  startDate      DateTime?  @map("start_date")
+  endDate        DateTime?  @map("end_date")
+  status         ExamStatus @default(UPCOMING)
+
+  academicYear AcademicYear  @relation(fields: [academicYearId], references: [id])
+  examSubjects ExamSubject[]
+  marks        Mark[]
+
+  @@map("exams")
+}
+
+model ExamSubject {
+  id         Int     @id @default(autoincrement())
+  examId     Int     @map("exam_id")
+  subjectId  Int     @map("subject_id")
+  classId    Int     @map("class_id")
+  fullMarks  Decimal @map("full_marks") @db.Decimal(5, 2)
+  passMarks  Decimal @map("pass_marks") @db.Decimal(5, 2)
+
+  exam    Exam    @relation(fields: [examId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+
+  @@map("exam_subjects")
+}
+
+model Mark {
+  id            Int      @id @default(autoincrement())
+  examId        Int      @map("exam_id")
+  studentId     Int      @map("student_id")
+  subjectId     Int      @map("subject_id")
+  obtainedMarks Decimal  @map("obtained_marks") @db.Decimal(5, 2)
+  grade         String?
+  remarks       String?
+
+  exam    Exam    @relation(fields: [examId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@map("marks")
+}
+
+model FeeHead {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+
+  feeStructures  FeeStructure[]
+  feeCollections FeeCollection[]
+
+  @@map("fee_heads")
+}
+
+model FeeStructure {
+  id             Int          @id @default(autoincrement())
+  academicYearId Int          @map("academic_year_id")
+  classId        Int          @map("class_id")
+  feeHeadId      Int          @map("fee_head_id")
+  amount         Decimal      @db.Decimal(10, 2)
+  frequency      FeeFrequency
+
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  feeHead      FeeHead      @relation(fields: [feeHeadId], references: [id])
+
+  @@map("fee_structures")
+}
+
+model FeeCollection {
+  id             Int           @id @default(autoincrement())
+  studentId      Int           @map("student_id")
+  academicYearId Int           @map("academic_year_id")
+  feeHeadId      Int           @map("fee_head_id")
+  amount         Decimal       @db.Decimal(10, 2)
+  paidAmount     Decimal       @map("paid_amount") @db.Decimal(10, 2)
+  discount       Decimal       @default(0) @db.Decimal(10, 2)
+  fine           Decimal       @default(0) @db.Decimal(10, 2)
+  paymentDate    DateTime      @map("payment_date")
+  paymentMethod  PaymentMethod @map("payment_method")
+  receiptNo      String        @map("receipt_no")
+  collectedBy    Int           @map("collected_by")
+  remarks        String?
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  feeHead      FeeHead      @relation(fields: [feeHeadId], references: [id])
+  collectedByUser User      @relation("CollectedBy", fields: [collectedBy], references: [id])
+
+  @@map("fee_collections")
+}
+
+model Notice {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  publishedBy Int      @map("published_by")
+  publishDate DateTime @map("publish_date")
+  status      Status   @default(ACTIVE)
+
+  publisher User @relation("PublishedBy", fields: [publishedBy], references: [id])
+
+  @@map("notices")
+}
