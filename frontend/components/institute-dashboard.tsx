@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import axios from "axios";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -135,7 +136,23 @@ export function InstituteDashboard() {
         Connecting to institute workspace
       </div>
     );
-  if (currentUser.isError || !currentUser.data) return <AuthScreen />;
+  if (currentUser.isError) {
+    const status = axios.isAxiosError(currentUser.error)
+      ? currentUser.error.response?.status
+      : undefined;
+    if (status === 401) return <AuthScreen />;
+    return (
+      <div className="app-loading" role="alert">
+        <span>
+          Could not verify your session. Check the connection and retry.
+        </span>
+        <Button variant="outline" onClick={() => currentUser.refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+  if (!currentUser.data) return <AuthScreen />;
   return <Workspace user={currentUser.data} />;
 }
 
